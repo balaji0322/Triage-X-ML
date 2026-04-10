@@ -1,0 +1,17 @@
+/* src/components/ResultCard.css */
+.result-card {
+  color: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.result-card h2 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.result-card p {
+  margin: 0.5rem 0 0;
+}
