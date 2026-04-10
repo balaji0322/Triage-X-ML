@@ -1,6 +1,5 @@
 {
-  "0": "Immediate",
-  "1": "Urgent",
-  "2": "Moderate",
-  "3": "Minor"
+  "0": "Urgent",
+  "1": "Moderate",
+  "2": "Minor"
 }
