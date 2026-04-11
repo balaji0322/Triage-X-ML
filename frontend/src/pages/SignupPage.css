@@ -1,0 +1,136 @@
+.signup-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.signup-card {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.signup-title {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.signup-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 1rem;
+}
+
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group textarea {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.3s;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.signup-btn {
+  padding: 14px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+  margin-top: 10px;
+}
+
+.signup-btn:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.signup-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-link {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+.login-link a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-link a:hover {
+  text-decoration: underline;
+}
+
+/* Success card styles */
+.success-card {
+  text-align: center;
+}
+
+.success-title {
+  color: #22c55e;
+  font-size: 1.8rem;
+  margin-bottom: 30px;
+}
+
+.hospital-id-display {
+  background: #f0f9ff;
+  border: 2px solid #667eea;
+  border-radius: 12px;
+  padding: 30px;
+  margin: 20px 0;
+}
+
+.hospital-id-display p {
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.hospital-id {
+  color: #667eea;
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 10px 0;
+  letter-spacing: 2px;
+}
+
+.id-note {
+  color: #f59e0b;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-top: 15px;
+}
+
+.redirect-note {
+  color: #666;
+  font-style: italic;
+  margin-top: 20px;
+}

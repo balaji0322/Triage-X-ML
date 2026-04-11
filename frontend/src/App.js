@@ -1,13 +1,25 @@
 // src/App.js
 import React from "react";
-import PatientForm from "./components/PatientForm";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import AmbulanceSignup from "./pages/AmbulanceSignup";
+import HospitalSignup from "./pages/HospitalSignup";
+import AmbulanceDashboard from "./pages/AmbulanceDashboard";
+import HospitalDashboard from "./pages/HospitalDashboard";
 import "./App.css";
 
 function App() {
   return (
-    <div className="App">
-      <PatientForm />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/ambulance/signup" element={<AmbulanceSignup />} />
+        <Route path="/hospital/signup" element={<HospitalSignup />} />
+        <Route path="/ambulance/dashboard" element={<AmbulanceDashboard />} />
+        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
+      </Routes>
+    </Router>
   );
 }
 

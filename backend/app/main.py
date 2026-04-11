@@ -9,11 +9,13 @@ import numpy as np
 
 from .schemas import PatientInput, PredictionResponse
 from .utils import load_artifacts, severity_code_to_name, get_color
+from .auth_routes import router as auth_router
+from .database import connect_db, disconnect_db
 
 app = FastAPI(
     title="TRIAGE‑X API",
     description="Predict patient severity from vitals, symptoms, history and demographics.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # ------------------------------------------------------------------
@@ -26,21 +28,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include authentication routes
+app.include_router(auth_router, prefix="/api", tags=["Authentication"])
+
 # ------------------------------------------------------------------
 @app.on_event("startup")
 def startup_event():
     log.info("🚀 TRIAGE‑X service starting...")
     try:
+        # Connect to MongoDB
+        connect_db()
+        log.info("✅ Database connected")
+        
+        # Load ML model
         load_artifacts()
         log.info("✅ Model artifacts loaded successfully")
         log.info("🚀 TRIAGE‑X service ready")
     except Exception as e:
-        log.error(f"❌ Failed to load model artifacts: {e}")
+        log.error(f"❌ Failed to start service: {e}")
         raise
 
 @app.on_event("shutdown")
 def shutdown_event():
     log.info("🛑 TRIAGE‑X service shutting down")
+    disconnect_db()
 
 # ------------------------------------------------------------------
 @app.post("/predict", response_model=PredictionResponse)
@@ -50,7 +61,7 @@ def predict(payload: PatientInput):
     
     # Convert Pydantic model to DataFrame (single‑row)
     try:
-        X = json.loads(payload.json())
+        X = json.loads(payload.model_dump_json())
         log.debug(f"Patient data: age={X.get('age')}, HR={X.get('heart_rate')}, O2={X.get('oxygen_saturation')}")
     except Exception as exc:
         log.error(f"❌ Invalid payload: {exc}")
@@ -60,8 +71,29 @@ def predict(payload: PatientInput):
         # 1️⃣  Load model & label map
         model, label_map, _ = load_artifacts()
         
-        # 2️⃣  Predict
+        # 2️⃣  Create DataFrame and add derived features (CRITICAL for model)
         df = pd.DataFrame([X])
+        
+        # Add derived features that the model was trained with
+        df['pulse_pressure'] = df['systolic_bp'] - df['diastolic_bp']
+        df['mean_arterial_pressure'] = df['diastolic_bp'] + (df['pulse_pressure'] / 3)
+        df['shock_index'] = df['heart_rate'] / df['systolic_bp']
+        df['age_risk'] = (df['age'] > 65).astype(int)
+        df['has_fever'] = (df['temperature'] > 38.0).astype(int)
+        df['hypoxia'] = (df['oxygen_saturation'] < 92).astype(int)
+        df['tachycardia'] = (df['heart_rate'] > 100).astype(int)
+        df['tachypnea'] = (df['respiratory_rate'] > 20).astype(int)
+        df['hypotension'] = (df['systolic_bp'] < 90).astype(int)
+        df['comorbidity_count'] = (
+            df['diabetes'] + df['heart_disease'] + 
+            df['hypertension'] + df['asthma']
+        )
+        df['critical_symptoms'] = (
+            df['chest_pain'] + df['breathing_difficulty'] + 
+            df['injury_type']
+        )
+        
+        # 3️⃣  Predict
         probs = model.predict_proba(df)[0]
         pred_index = int(probs.argmax())
         pred_name = label_map[str(pred_index)]
@@ -69,7 +101,7 @@ def predict(payload: PatientInput):
         
         log.info(f"✅ Inference: predicted {pred_name} (code {pred_index}) with confidence {confidence:.4f}")
         
-        # 3️⃣  Build response
+        # 4️⃣  Build response
         response = PredictionResponse(
             severity=pred_name,
             severity_code=pred_index,
@@ -122,9 +154,28 @@ def explain(payload: PatientInput):
         # Load model
         model, label_map, _ = load_artifacts()
         
-        # Convert to DataFrame
-        X = json.loads(payload.json())
+        # Convert to DataFrame and add derived features
+        X = json.loads(payload.model_dump_json())
         df = pd.DataFrame([X])
+        
+        # Add derived features (same as predict endpoint)
+        df['pulse_pressure'] = df['systolic_bp'] - df['diastolic_bp']
+        df['mean_arterial_pressure'] = df['diastolic_bp'] + (df['pulse_pressure'] / 3)
+        df['shock_index'] = df['heart_rate'] / df['systolic_bp']
+        df['age_risk'] = (df['age'] > 65).astype(int)
+        df['has_fever'] = (df['temperature'] > 38.0).astype(int)
+        df['hypoxia'] = (df['oxygen_saturation'] < 92).astype(int)
+        df['tachycardia'] = (df['heart_rate'] > 100).astype(int)
+        df['tachypnea'] = (df['respiratory_rate'] > 20).astype(int)
+        df['hypotension'] = (df['systolic_bp'] < 90).astype(int)
+        df['comorbidity_count'] = (
+            df['diabetes'] + df['heart_disease'] + 
+            df['hypertension'] + df['asthma']
+        )
+        df['critical_symptoms'] = (
+            df['chest_pain'] + df['breathing_difficulty'] + 
+            df['injury_type']
+        )
         
         # Get prediction
         pred_index = model.predict(df)[0]
