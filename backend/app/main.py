@@ -10,6 +10,10 @@ import numpy as np
 from .schemas import PatientInput, PredictionResponse
 from .utils import load_artifacts, severity_code_to_name, get_color
 from .auth_routes import router as auth_router
+from .websocket_routes import router as websocket_router
+from .advanced_features import router as advanced_router
+from .gps_integration import router as gps_router
+from .location_tracking import router as location_router
 from .database import connect_db, disconnect_db
 
 app = FastAPI(
@@ -30,6 +34,18 @@ app.add_middleware(
 
 # Include authentication routes
 app.include_router(auth_router, prefix="/api", tags=["Authentication"])
+
+# Include WebSocket routes
+app.include_router(websocket_router, tags=["WebSocket"])
+
+# Include advanced features routes
+app.include_router(advanced_router, prefix="/api", tags=["Advanced Features"])
+
+# Include GPS integration routes
+app.include_router(gps_router, prefix="/api", tags=["GPS Integration"])
+
+# Include location tracking routes
+app.include_router(location_router, prefix="/api", tags=["Location Tracking"])
 
 # ------------------------------------------------------------------
 @app.on_event("startup")

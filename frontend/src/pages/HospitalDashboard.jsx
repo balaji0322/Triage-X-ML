@@ -1,7 +1,14 @@
 // src/pages/HospitalDashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCases, getHospitalStats } from '../api';
+import { 
+  getCases, 
+  getHospitalStats, 
+  WebSocketManager,
+  getAmbulanceLocations,
+  LocationWebSocketManager
+} from '../api';
+import HospitalTrackingMap from '../components/HospitalTrackingMap';
 import './HospitalDashboard.css';
 
 function HospitalDashboard() {
@@ -11,6 +18,13 @@ function HospitalDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsManager = useRef(null);
+  
+  // Location tracking state
+  const [ambulanceLocations, setAmbulanceLocations] = useState([]);
+  const [showMap, setShowMap] = useState(true);
+  const locationWsRef = useRef(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -24,10 +38,84 @@ function HospitalDashboard() {
     setUser(JSON.parse(userData));
     loadData();
     
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(loadData, 10000);
-    return () => clearInterval(interval);
-  }, [navigate]);
+    // 🚀 FEATURE 1: Initialize WebSocket connection
+    wsManager.current = new WebSocketManager('hospital');
+    wsManager.current.connect(
+      (message) => {
+        console.log('📨 WebSocket message received:', message);
+        
+        if (message.type === 'connection') {
+          setWsConnected(true);
+        } else if (message.type === 'new_case') {
+          // Add new case to the list
+          setCases(prevCases => [message.case, ...prevCases]);
+          // Reload stats
+          loadStats();
+          // Show notification
+          showNotification(message.case);
+        }
+      },
+      (error) => {
+        console.error('❌ WebSocket error:', error);
+        setWsConnected(false);
+      }
+    );
+    
+    // Fallback: Polling every 10 seconds if WebSocket fails
+    const pollingInterval = setInterval(() => {
+      if (!wsConnected) {
+        console.log('🔄 Polling for updates (WebSocket not connected)');
+        loadData();
+      }
+    }, 10000);
+    
+    // Initialize location tracking WebSocket
+    initializeLocationTracking();
+    
+    return () => {
+      clearInterval(pollingInterval);
+      if (wsManager.current) {
+        wsManager.current.disconnect();
+      }
+      if (locationWsRef.current) {
+        locationWsRef.current.disconnect();
+      }
+    };
+  }, [navigate, wsConnected]);
+  
+  // Initialize location tracking
+  const initializeLocationTracking = async () => {
+    try {
+      // Get initial ambulance locations
+      const locations = await getAmbulanceLocations();
+      setAmbulanceLocations(locations);
+      
+      // Connect to location WebSocket
+      locationWsRef.current = new LocationWebSocketManager('hospital');
+      locationWsRef.current.connect(
+        (message) => {
+          if (message.type === 'location_update') {
+            // Update ambulance location in real-time
+            setAmbulanceLocations(prev => {
+              const updated = prev.filter(
+                amb => amb.ambulance_id !== message.ambulance_id
+              );
+              return [...updated, {
+                ambulance_id: message.ambulance_id,
+                ...message.location,
+                timestamp: message.timestamp
+              }];
+            });
+          }
+        },
+        (error) => {
+          console.error('Location WebSocket error:', error);
+        }
+      );
+    } catch (err) {
+      console.error('Failed to initialize location tracking:', err);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -44,9 +132,41 @@ function HospitalDashboard() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const statsData = await getHospitalStats();
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    }
+  };
+
+  const showNotification = (caseData) => {
+    // Show browser notification if permitted
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('🚨 New Emergency Case', {
+        body: `${caseData.severity} case from ${caseData.ambulance_number}`,
+        icon: '/favicon.ico'
+      });
+    }
+    
+    // Play sound for urgent cases
+    if (caseData.severity === 'Urgent' || caseData.severity === 'Immediate') {
+      const audio = new Audio('/notification.mp3');
+      audio.play().catch(e => console.log('Audio play failed:', e));
+    }
+  };
+
   const handleLogout = () => {
+    if (wsManager.current) {
+      wsManager.current.disconnect();
+    }
     localStorage.clear();
     navigate('/login');
+  };
+
+  const navigateToAnalytics = () => {
+    navigate('/admin/analytics');
   };
 
   const getSeverityColor = (severity) => {
@@ -71,6 +191,12 @@ function HospitalDashboard() {
         <div className="header-content">
           <h1>🏥 Hospital Dashboard</h1>
           <div className="user-info">
+            <span className={`ws-indicator ${wsConnected ? 'connected' : 'disconnected'}`}>
+              {wsConnected ? '🟢 Live' : '🔴 Polling'}
+            </span>
+            <button onClick={navigateToAnalytics} className="analytics-btn">
+              📊 Analytics
+            </button>
             <span>{user.hospital_name} ({user.hospital_id})</span>
             <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>
@@ -107,6 +233,30 @@ function HospitalDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Real-Time Ambulance Tracking Map */}
+            <div className="card map-card">
+              <div className="card-header">
+                <h2>🗺️ Real-Time Ambulance Tracking</h2>
+                <button 
+                  onClick={() => setShowMap(!showMap)} 
+                  className="toggle-map-btn"
+                >
+                  {showMap ? '📊 Show Table' : '🗺️ Show Map'}
+                </button>
+              </div>
+              
+              {showMap && (
+                <HospitalTrackingMap
+                  ambulances={ambulanceLocations}
+                  hospitalLocation={user ? {
+                    latitude: user.latitude || 13.0827,
+                    longitude: user.longitude || 80.2707,
+                    name: user.hospital_name
+                  } : null}
+                />
+              )}
+            </div>
 
             {/* Filter Buttons */}
             <div className="filter-section">

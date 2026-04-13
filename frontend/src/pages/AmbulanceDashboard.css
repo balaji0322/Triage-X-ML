@@ -293,3 +293,62 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Map Card Styles */
+.map-card {
+  margin-bottom: 2rem;
+}
+
+.map-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.location-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-active {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.status-inactive {
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.loading-location {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  font-size: 16px;
+}
+
+.recommended-hospital-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+}
+
+.recommended-hospital-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 18px;
+}
+
+.hospital-details p {
+  margin: 0.5rem 0;
+  font-size: 14px;
+}
+
+.hospital-details strong {
+  font-size: 16px;
+}

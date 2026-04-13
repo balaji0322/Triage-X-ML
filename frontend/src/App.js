@@ -6,6 +6,7 @@ import AmbulanceSignup from "./pages/AmbulanceSignup";
 import HospitalSignup from "./pages/HospitalSignup";
 import AmbulanceDashboard from "./pages/AmbulanceDashboard";
 import HospitalDashboard from "./pages/HospitalDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import "./App.css";
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/hospital/signup" element={<HospitalSignup />} />
         <Route path="/ambulance/dashboard" element={<AmbulanceDashboard />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
+        <Route path="/admin/analytics" element={<AdminDashboard />} />
       </Routes>
     </Router>
   );

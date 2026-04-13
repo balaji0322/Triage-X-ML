@@ -12,6 +12,7 @@ from .auth_schemas import (
 )
 from .auth import hash_password, verify_password, create_access_token, require_ambulance, require_hospital
 from .database import get_db
+from .websocket_manager import manager
 
 router = APIRouter()
 
@@ -217,11 +218,37 @@ async def send_case(data: CaseCreate, current_user: dict = Depends(require_ambul
         "severity": data.severity,
         "confidence": data.confidence,
         "timestamp": datetime.utcnow(),
-        "status": "pending"
+        "status": "pending",
+        "hospital_assigned": data.patient_data.get("hospital_assigned"),  # Optional
+        "risk_score": int(data.confidence * 100)  # FEATURE 3: Risk score
     }
     
     db.cases.insert_one(case_doc)
     log.info(f"✅ Case created: {case_id} - Severity: {data.severity}")
+    
+    # 🚀 FEATURE 1: Broadcast new case to all connected hospitals via WebSocket
+    try:
+        await manager.broadcast_to_hospitals({
+            "type": "new_case",
+            "case": {
+                "case_id": case_id,
+                "ambulance_number": ambulance["ambulance_number"],
+                "driver_name": ambulance["driver_name"],
+                "severity": data.severity,
+                "confidence": data.confidence,
+                "timestamp": case_doc["timestamp"].isoformat(),
+                "status": "pending",
+                "patient_age": data.patient_data.get("age"),
+                "patient_vitals": {
+                    "heart_rate": data.patient_data.get("heart_rate"),
+                    "oxygen_saturation": data.patient_data.get("oxygen_saturation"),
+                    "systolic_bp": data.patient_data.get("systolic_bp")
+                }
+            }
+        })
+        log.info(f"📡 Case broadcasted to {manager.get_connection_count('hospital')} hospitals")
+    except Exception as e:
+        log.warning(f"⚠️ WebSocket broadcast failed (non-critical): {e}")
     
     return CaseResponse(**case_doc)
 

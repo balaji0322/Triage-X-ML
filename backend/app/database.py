@@ -23,8 +23,12 @@ def connect_db():
         # Create indexes
         db.ambulances.create_index([("ambulance_number", ASCENDING)], unique=True)
         db.hospitals.create_index([("hospital_id", ASCENDING)], unique=True)
+        db.hospitals.create_index([("address", ASCENDING)])  # For location-based queries
         db.cases.create_index([("case_id", ASCENDING)], unique=True)
         db.cases.create_index([("timestamp", ASCENDING)])
+        db.cases.create_index([("severity", ASCENDING)])  # For analytics
+        db.cases.create_index([("hospital_assigned", ASCENDING)])  # For allocation
+        db.cases.create_index([("status", ASCENDING)])  # For filtering
         
         log.info(f"✅ Connected to MongoDB: {DB_NAME}")
     except Exception as e:

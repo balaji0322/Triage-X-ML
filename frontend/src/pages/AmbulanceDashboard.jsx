@@ -1,7 +1,14 @@
 // src/pages/AmbulanceDashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { predictSeverity, sendCase, getAmbulanceRecentCases } from '../api';
+import { 
+  predictSeverity, 
+  sendCase, 
+  getAmbulanceRecentCases,
+  getNearestHospitals,
+  LocationWebSocketManager
+} from '../api';
+import AmbulanceMap from '../components/AmbulanceMap';
 import './AmbulanceDashboard.css';
 
 function AmbulanceDashboard() {
@@ -12,6 +19,14 @@ function AmbulanceDashboard() {
   const [recentCases, setRecentCases] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Location tracking state
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [nearbyHospitals, setNearbyHospitals] = useState([]);
+  const [recommendedHospital, setRecommendedHospital] = useState(null);
+  const [locationTracking, setLocationTracking] = useState(false);
+  const locationWsRef = useRef(null);
+  const watchIdRef = useRef(null);
 
   const [patientData, setPatientData] = useState({
     heart_rate: '',
@@ -43,7 +58,106 @@ function AmbulanceDashboard() {
     
     setUser(JSON.parse(userData));
     loadRecentCases();
+    
+    // Start location tracking
+    startLocationTracking();
+    
+    return () => {
+      // Cleanup on unmount
+      stopLocationTracking();
+    };
   }, [navigate]);
+  
+  // Start real-time location tracking
+  const startLocationTracking = () => {
+    if ('geolocation' in navigator) {
+      // Get initial location
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            speed: position.coords.speed || 0,
+            heading: position.coords.heading || 0
+          };
+          setCurrentLocation(location);
+          loadNearbyHospitals(location.latitude, location.longitude);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          setError('Unable to get your location. Please enable GPS.');
+        }
+      );
+      
+      // Watch position changes
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            speed: position.coords.speed || 0,
+            heading: position.coords.heading || 0
+          };
+          setCurrentLocation(location);
+          
+          // Send location via WebSocket if connected
+          if (locationWsRef.current) {
+            locationWsRef.current.sendLocation(location);
+          }
+        },
+        (error) => {
+          console.error('Watch position error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+      
+      // Initialize WebSocket for location updates
+      const token = localStorage.getItem('token');
+      locationWsRef.current = new LocationWebSocketManager('ambulance', token);
+      locationWsRef.current.connect(
+        (message) => {
+          console.log('Location WebSocket message:', message);
+        },
+        (error) => {
+          console.error('Location WebSocket error:', error);
+        }
+      );
+      
+      setLocationTracking(true);
+    } else {
+      setError('Geolocation is not supported by your browser');
+    }
+  };
+  
+  // Stop location tracking
+  const stopLocationTracking = () => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    
+    if (locationWsRef.current) {
+      locationWsRef.current.disconnect();
+      locationWsRef.current = null;
+    }
+    
+    setLocationTracking(false);
+  };
+  
+  // Load nearby hospitals
+  const loadNearbyHospitals = async (lat, lng) => {
+    try {
+      const response = await getNearestHospitals(lat, lng, 10);
+      setNearbyHospitals(response.hospitals);
+      setRecommendedHospital(response.recommended_hospital);
+    } catch (err) {
+      console.error('Failed to load nearby hospitals:', err);
+    }
+  };
 
   const loadRecentCases = async () => {
     try {
@@ -143,6 +257,47 @@ function AmbulanceDashboard() {
       <div className="dashboard-content">
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
+
+        {/* Real-Time Location & Hospital Map */}
+        <div className="card map-card">
+          <div className="card-header">
+            <h2>📍 Real-Time Location & Nearby Hospitals</h2>
+            <div className="location-status">
+              {locationTracking ? (
+                <span className="status-active">🟢 GPS Active</span>
+              ) : (
+                <span className="status-inactive">🔴 GPS Inactive</span>
+              )}
+            </div>
+          </div>
+          
+          {currentLocation ? (
+            <>
+              <AmbulanceMap
+                currentLocation={currentLocation}
+                hospitals={nearbyHospitals}
+                recommendedHospital={recommendedHospital}
+              />
+              
+              {recommendedHospital && (
+                <div className="recommended-hospital-info">
+                  <h3>⭐ Recommended Hospital</h3>
+                  <div className="hospital-details">
+                    <p><strong>{recommendedHospital.hospital_name}</strong></p>
+                    <p>📍 Distance: {recommendedHospital.distance_km} km</p>
+                    <p>🛏️ Available Beds: {recommendedHospital.available_beds}</p>
+                    <p>📊 Current Load: {recommendedHospital.current_load}</p>
+                    <p>🎯 Score: {recommendedHospital.score}</p>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="loading-location">
+              <p>📡 Getting your location...</p>
+            </div>
+          )}
+        </div>
 
         <div className="dashboard-grid">
           {/* Patient Input Form */}
