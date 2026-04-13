@@ -135,14 +135,16 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return round(distance, 2)
 
 
-def calculate_hospital_score(distance_km: float, available_beds: int, current_load: int) -> float:
+def calculate_hospital_score(distance_km: float, available_beds: int, current_load: int, icu_available: int = 0) -> float:
     """
     Calculate hospital recommendation score.
     Lower score = better choice
     
-    Formula: score = (0.5 * distance) + (-0.3 * beds) + (0.2 * load)
+    Formula: score = (0.5 * distance) + (0.3 * load) - (0.7 * icu_available)
+    
+    ICU availability is heavily weighted to prioritize hospitals with available ICU beds.
     """
-    score = (0.5 * distance_km) + (-0.3 * available_beds) + (0.2 * current_load)
+    score = (0.5 * distance_km) + (0.3 * current_load) - (0.7 * icu_available)
     return round(score, 2)
 
 
@@ -285,6 +287,14 @@ async def get_nearest_hospitals(
         hospital_scores = []
         
         for hospital in hospitals:
+            # Get ICU availability
+            icu_available = hospital.get("icu_available", 0)
+            
+            # Skip hospitals with no ICU beds available
+            if icu_available == 0:
+                log.debug(f"Skipping {hospital['hospital_id']} - no ICU beds available")
+                continue
+            
             # Calculate distance
             distance = haversine_distance(
                 lat, lng,
@@ -296,8 +306,8 @@ async def get_nearest_hospitals(
             available_beds = hospital.get("available_beds", 10)
             current_load = hospital.get("current_load", 0)
             
-            # Calculate score
-            score = calculate_hospital_score(distance, available_beds, current_load)
+            # Calculate score with ICU availability
+            score = calculate_hospital_score(distance, available_beds, current_load, icu_available)
             
             hospital_info = HospitalInfo(
                 hospital_id=hospital["hospital_id"],

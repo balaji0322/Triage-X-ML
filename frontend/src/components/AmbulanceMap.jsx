@@ -135,6 +135,7 @@ function AmbulanceMap({ currentLocation, hospitals, recommendedHospital }) {
                   <h3>🏥 {hospital.hospital_name}</h3>
                   <p><strong>Distance:</strong> {hospital.distance_km} km</p>
                   <p><strong>Available Beds:</strong> {hospital.available_beds}</p>
+                  <p><strong>ICU Available:</strong> {hospital.icu_available || 0}/{hospital.icu_total || 0}</p>
                   <p><strong>Current Load:</strong> {hospital.current_load}</p>
                   <p><strong>Score:</strong> {hospital.score}</p>
                   <p className="hospital-address">{hospital.address}</p>

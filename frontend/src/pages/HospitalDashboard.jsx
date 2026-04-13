@@ -6,7 +6,9 @@ import {
   getHospitalStats, 
   WebSocketManager,
   getAmbulanceLocations,
-  LocationWebSocketManager
+  LocationWebSocketManager,
+  updateICUBeds,
+  getICUStatus
 } from '../api';
 import HospitalTrackingMap from '../components/HospitalTrackingMap';
 import './HospitalDashboard.css';
@@ -25,6 +27,20 @@ function HospitalDashboard() {
   const [ambulanceLocations, setAmbulanceLocations] = useState([]);
   const [showMap, setShowMap] = useState(true);
   const locationWsRef = useRef(null);
+  
+  // ICU management state
+  const [icuData, setIcuData] = useState({
+    icu_total: 0,
+    icu_available: 0,
+    icu_occupied: 0,
+    occupancy_rate: 0
+  });
+  const [icuFormData, setIcuFormData] = useState({
+    icu_total: '',
+    icu_available: ''
+  });
+  const [icuUpdateSuccess, setIcuUpdateSuccess] = useState('');
+  const [icuUpdateError, setIcuUpdateError] = useState('');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -37,6 +53,7 @@ function HospitalDashboard() {
     
     setUser(JSON.parse(userData));
     loadData();
+    loadICUData(JSON.parse(userData).hospital_id);
     
     // 🚀 FEATURE 1: Initialize WebSocket connection
     wsManager.current = new WebSocketManager('hospital');
@@ -53,6 +70,16 @@ function HospitalDashboard() {
           loadStats();
           // Show notification
           showNotification(message.case);
+        } else if (message.type === 'icu_update') {
+          // Update ICU data in real-time
+          if (message.hospital_id === JSON.parse(userData).hospital_id) {
+            setIcuData({
+              icu_total: message.icu_total,
+              icu_available: message.icu_available,
+              icu_occupied: message.icu_occupied,
+              occupancy_rate: message.occupancy_rate
+            });
+          }
         }
       },
       (error) => {
@@ -138,6 +165,50 @@ function HospitalDashboard() {
       setStats(statsData);
     } catch (err) {
       console.error('Failed to load stats:', err);
+    }
+  };
+  
+  const loadICUData = async (hospitalId) => {
+    try {
+      const data = await getICUStatus(hospitalId);
+      setIcuData({
+        icu_total: data.icu_total,
+        icu_available: data.icu_available,
+        icu_occupied: data.icu_occupied,
+        occupancy_rate: data.occupancy_rate
+      });
+      setIcuFormData({
+        icu_total: data.icu_total.toString(),
+        icu_available: data.icu_available.toString()
+      });
+    } catch (err) {
+      console.error('Failed to load ICU data:', err);
+    }
+  };
+  
+  const handleICUUpdate = async (e) => {
+    e.preventDefault();
+    setIcuUpdateError('');
+    setIcuUpdateSuccess('');
+    
+    try {
+      const result = await updateICUBeds(
+        user.hospital_id,
+        parseInt(icuFormData.icu_total),
+        parseInt(icuFormData.icu_available)
+      );
+      
+      setIcuData({
+        icu_total: result.icu_total,
+        icu_available: result.icu_available,
+        icu_occupied: result.icu_occupied,
+        occupancy_rate: result.occupancy_rate
+      });
+      
+      setIcuUpdateSuccess('✅ ICU beds updated successfully!');
+      setTimeout(() => setIcuUpdateSuccess(''), 3000);
+    } catch (err) {
+      setIcuUpdateError(err.response?.data?.detail || 'Failed to update ICU beds');
     }
   };
 
@@ -233,6 +304,74 @@ function HospitalDashboard() {
                 </div>
               </div>
             )}
+
+            {/* ICU Bed Management */}
+            <div className="card icu-management-card">
+              <div className="card-header">
+                <h2>🏥 ICU Bed Management</h2>
+              </div>
+              
+              <div className="icu-content">
+                {/* Current ICU Status */}
+                <div className="icu-status">
+                  <h3>Current Status</h3>
+                  <div className="icu-stats-grid">
+                    <div className="icu-stat">
+                      <div className="icu-stat-value">{icuData.icu_total}</div>
+                      <div className="icu-stat-label">Total ICU Beds</div>
+                    </div>
+                    <div className="icu-stat">
+                      <div className="icu-stat-value" style={{ color: '#22c55e' }}>{icuData.icu_available}</div>
+                      <div className="icu-stat-label">Available</div>
+                    </div>
+                    <div className="icu-stat">
+                      <div className="icu-stat-value" style={{ color: '#ef4444' }}>{icuData.icu_occupied}</div>
+                      <div className="icu-stat-label">Occupied</div>
+                    </div>
+                    <div className="icu-stat">
+                      <div className="icu-stat-value">{icuData.occupancy_rate}%</div>
+                      <div className="icu-stat-label">Occupancy Rate</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Update ICU Form */}
+                <div className="icu-update-form">
+                  <h3>Update ICU Availability</h3>
+                  {icuUpdateSuccess && <div className="alert alert-success">{icuUpdateSuccess}</div>}
+                  {icuUpdateError && <div className="alert alert-error">{icuUpdateError}</div>}
+                  
+                  <form onSubmit={handleICUUpdate}>
+                    <div className="form-row">
+                      <div className="form-field">
+                        <label>Total ICU Beds</label>
+                        <input
+                          type="number"
+                          value={icuFormData.icu_total}
+                          onChange={(e) => setIcuFormData({ ...icuFormData, icu_total: e.target.value })}
+                          required
+                          min="0"
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label>Available ICU Beds</label>
+                        <input
+                          type="number"
+                          value={icuFormData.icu_available}
+                          onChange={(e) => setIcuFormData({ ...icuFormData, icu_available: e.target.value })}
+                          required
+                          min="0"
+                          max={icuFormData.icu_total}
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="update-icu-btn">
+                      🔄 Update ICU Beds
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
 
             {/* Real-Time Ambulance Tracking Map */}
             <div className="card map-card">

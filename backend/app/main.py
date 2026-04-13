@@ -14,6 +14,7 @@ from .websocket_routes import router as websocket_router
 from .advanced_features import router as advanced_router
 from .gps_integration import router as gps_router
 from .location_tracking import router as location_router
+from .icu_management import router as icu_router
 from .database import connect_db, disconnect_db
 
 app = FastAPI(
@@ -46,6 +47,9 @@ app.include_router(gps_router, prefix="/api", tags=["GPS Integration"])
 
 # Include location tracking routes
 app.include_router(location_router, prefix="/api", tags=["Location Tracking"])
+
+# Include ICU management routes
+app.include_router(icu_router, prefix="/api", tags=["ICU Management"])
 
 # ------------------------------------------------------------------
 @app.on_event("startup")

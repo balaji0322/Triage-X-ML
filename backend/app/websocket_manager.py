@@ -48,6 +48,35 @@ class ConnectionManager:
         for conn in disconnected:
             self.disconnect(conn, "hospital")
     
+    async def broadcast_to_all(self, message: dict):
+        """Broadcast a message to all connected clients (hospitals and ambulances)."""
+        disconnected_hospitals = []
+        disconnected_ambulances = []
+        
+        # Broadcast to hospitals
+        for connection in self.active_connections["hospital"]:
+            try:
+                await connection.send_json(message)
+                log.debug(f"📤 Broadcasted to hospital client")
+            except Exception as e:
+                log.error(f"❌ Failed to send to hospital: {e}")
+                disconnected_hospitals.append(connection)
+        
+        # Broadcast to ambulances
+        for connection in self.active_connections["ambulance"]:
+            try:
+                await connection.send_json(message)
+                log.debug(f"📤 Broadcasted to ambulance client")
+            except Exception as e:
+                log.error(f"❌ Failed to send to ambulance: {e}")
+                disconnected_ambulances.append(connection)
+        
+        # Clean up disconnected clients
+        for conn in disconnected_hospitals:
+            self.disconnect(conn, "hospital")
+        for conn in disconnected_ambulances:
+            self.disconnect(conn, "ambulance")
+    
     async def send_personal_message(self, message: dict, websocket: WebSocket):
         """Send a message to a specific WebSocket connection."""
         try:

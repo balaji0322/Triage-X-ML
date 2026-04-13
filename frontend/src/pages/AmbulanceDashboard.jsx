@@ -152,7 +152,13 @@ function AmbulanceDashboard() {
   const loadNearbyHospitals = async (lat, lng) => {
     try {
       const response = await getNearestHospitals(lat, lng, 10);
-      setNearbyHospitals(response.hospitals);
+      // Add ICU data to hospitals
+      const hospitalsWithICU = response.hospitals.map(h => ({
+        ...h,
+        icu_available: h.icu_available || 0,
+        icu_total: h.icu_total || 0
+      }));
+      setNearbyHospitals(hospitalsWithICU);
       setRecommendedHospital(response.recommended_hospital);
     } catch (err) {
       console.error('Failed to load nearby hospitals:', err);
@@ -286,6 +292,7 @@ function AmbulanceDashboard() {
                     <p><strong>{recommendedHospital.hospital_name}</strong></p>
                     <p>📍 Distance: {recommendedHospital.distance_km} km</p>
                     <p>🛏️ Available Beds: {recommendedHospital.available_beds}</p>
+                    <p>🏥 ICU Available: {recommendedHospital.icu_available || 0}/{recommendedHospital.icu_total || 0}</p>
                     <p>📊 Current Load: {recommendedHospital.current_load}</p>
                     <p>🎯 Score: {recommendedHospital.score}</p>
                   </div>

@@ -338,3 +338,33 @@ export const updateHospitalData = async (hospitalId, availableBeds, currentLoad)
   return response.data;
 };
 
+// ============ ICU MANAGEMENT ============
+
+// Update ICU bed availability
+export const updateICUBeds = async (hospitalId, icuTotal, icuAvailable) => {
+  const response = await api.put('/api/hospital/update-icu', {
+    hospital_id: hospitalId,
+    icu_total: icuTotal,
+    icu_available: icuAvailable
+  });
+  return response.data;
+};
+
+// Get ICU status for a hospital
+export const getICUStatus = async (hospitalId) => {
+  const response = await api.get(`/api/hospital/icu-status/${hospitalId}`);
+  return response.data;
+};
+
+// Get overall ICU statistics
+export const getICUStatistics = async () => {
+  const response = await api.get('/api/hospital/icu-stats');
+  return response.data;
+};
+
+// Get all hospitals with ICU data
+export const getHospitalsWithICU = async () => {
+  const response = await api.get('/api/hospitals/with-icu');
+  return response.data;
+};
+
